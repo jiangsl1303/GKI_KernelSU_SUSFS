@@ -508,18 +508,11 @@ jobs:
 
           mapfile -t SORTED_KERNELS < <(printf '%s\n' "${KERNELS_TO_FETCH_SUSFS[@]}" | sort)
           KERNELS_TO_FETCH_SUSFS=("${SORTED_KERNELS[@]}")
-          
-          for kernel_id in "${KERNELS_TO_FETCH_SUSFS[@]}"; do
-            susfs_branch_name="${BRANCH_MAP[$kernel_id]}"
-            if [[ -n "$susfs_branch_name" ]]; then
-              SUSFS_COMMIT_HASH=$(git ls-remote "https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO.git" "refs/heads/$susfs_branch_name" | awk '{ print $1 }')
-              SUSFS_COMMIT_HASH="${SUSFS_COMMIT_HASH:-UNKNOWN_COMMIT}"
-              SUSFS_COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$SUSFS_COMMIT_HASH"
-              FINAL_RELEASE_NOTES+="\n - ${kernel_id}: [${SUSFS_COMMIT_HASH}](${SUSFS_COMMIT_URL})"
-            else
-              echo "Warning: SUSFS branch name not found for kernel ID: $kernel_id. Cannot fetch commit info." >&2
-            fi
-          done
+
+
+
+          for kernel_id in "${KERNELS_TO_FETCH_SUSFS[@]}"; do case "$kernel_id" in "a12-5.10") SUSFS_COMMIT_HASH="8a76ba240d1f7315352b49d97d854a4b166e5b47" ;; "a13-5.10") SUSFS_COMMIT_HASH="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92" ;; "a13-5.15") SUSFS_COMMIT_HASH="babf6be195576f09aae79650d47abf6a76e8a21b" ;; "a14-5.15") SUSFS_COMMIT_HASH="19f339e804ba9aebd9c6d735b965e2b9396c73ae" ;; "a14-6.1") SUSFS_COMMIT_HASH="a162e2469d0b472545e5e46457eee171c0975fb0" ;; "a15-6.6") SUSFS_COMMIT_HASH="f450ec00bf592d080f59b01ff6f9242456c9a427" ;; *) SUSFS_COMMIT_HASH="UNKNOWN_COMMIT" ;; esac SUSFS_COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$SUSFS_COMMIT_HASH" FINAL_RELEASE_NOTES+="\n - ${kernel_id}: [${SUSFS_COMMIT_HASH}](${SUSFS_COMMIT_URL})" done 
+
           
           FINAL_RELEASE_NOTES+="\n\n</details>"
           
