@@ -88,7 +88,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+      
       
  build-kernel-a13-5-10:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a13-5.10')
@@ -102,7 +102,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+      
       
   build-kernel-a13-5-15:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a13-5.15')
@@ -116,7 +116,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+      
       
   build-kernel-a14-5-15:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a14-5.15')
@@ -130,7 +130,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+      
       
   build-kernel-a14-6-1:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a14-6.1')
@@ -144,7 +144,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+    
       
   build-kernel-a15-6-6:
     if: contains(github.event.inputs.kernels_to_build, 'all') || contains(github.event.inputs.kernels_to_build, 'a15-6.6')
@@ -158,7 +158,7 @@ jobs:
       use_zram: ${{ inputs.use_zram }}
       use_kpm: ${{ inputs.use_kpm }}
       BBG: ${{ inputs.BBG }}
-      enable_lxc_docker: true
+      
       
   check-build-status:
     runs-on: ubuntu-latest
@@ -515,27 +515,59 @@ jobs:
           mapfile -t SORTED_KERNELS < <(printf '%s\n' "${KERNELS_TO_FETCH_SUSFS[@]}" | sort)
           KERNELS_TO_FETCH_SUSFS=("${SORTED_KERNELS[@]}")
           
-          declare -A SUSFS_COMMIT_MAP=(
-            ["a12-5.10"]="8a76ba240d1f7315352b49d97d854a4b166e5b47"
-            ["a13-5.10"]="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92"
-            ["a13-5.15"]="babf6be195576f09aae79650d47abf6a76e8a21b"
-            ["a14-5.15"]="19f339e804ba9aebd9c6d735b965e2b9396c73ae"
-            ["a14-6.1"]="a162e2469d0b472545e5e46457eee171c0975fb0"
-            ["a15-6 sixth"]="f450ec00bf592d080f59b01ff6f9242456c9a427"
-          )
-
-          SUKIULTRA_COMMIT="e6518a654f7a854235804184ee1ecb06430a9a53"
-
           for kernel_id in "${KERNELS_TO_FETCH_SUSFS[@]}"; do
-            SUSFS_COMMIT_HASH="${SUSFS_COMMIT_MAP[$kernel_id]:-UNKNOWN_COMMIT}"
+
+            case "$kernel_id" in
+   
+           "a12-5.10")
+ 
+               SUSFS_COMMIT_HASH="8a76ba240d1f7315352b49d97d854a4b166e5b47"
+    
+            ;;
+  
+            "a13-5.10")
+    
+            SUSFS_COMMIT_HASH="e5c9eabfc6dcfc677d11f46ce1d5ff786de60a92"
+  
+              ;;
+   
+           "a13-5.15")
+  
+              SUSFS_COMMIT_HASH="babf6be195576f09aae79650d47abf6a76e8a21b"
+  
+              ;;
+ 
+             "a14-5.15")
+   
+             SUSFS_COMMIT_HASH="19f339e804ba9aebd9c6d735b965e2b9396c73ae"
+    
+            ;;
+    
+          "a14-6.1")
+  
+              SUSFS_COMMIT_HASH="a162e2469d0b472545e5e46457eee171c0975fb0"
+   
+             ;;
+  
+          "a15-6.6")
+    
+            SUSFS_COMMIT_HASH="f450ec00bf592d080f59b01ff6f9242456c9a427"
+  
+              ;;
+
+              *)
+  
+              SUSFS_COMMIT_HASH="UNKNOWN_COMMIT"
+  
+              ;;
+
+            esac
+
             SUSFS_COMMIT_URL="https://gitlab.com/$GITLAB_OWNER/$GITLAB_REPO/-/commit/$SUSFS_COMMIT_HASH"
-            FINAL_RELEASE_NOTES+="\n - ${kernel_id}: [${SUSFS_COMMIT_HASH}](${SUSFS_COMMIT_URL})"
+ 
+           FINAL_RELEASE_NOTES+="\n - ${kernel_id}: [${SUSFS_COMMIT_HASH}](${SUSFS_COMMIT_URL})"
+
           done
-
-          if [ "${{ inputs.kernelsu_variant }}" == "SukiSU" ]; then
-            FINAL_RELEASE_NOTES=$(echo "$FINAL_RELEASE_NOTES" | sed "s|SukiSU Manager:.*|SukiSU Manager (Custom): $SUKIULTRA_COMMIT|")
-          fi
-
 
 
           
