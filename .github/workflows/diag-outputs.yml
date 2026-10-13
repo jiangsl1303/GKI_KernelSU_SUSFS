@@ -1,0 +1,19 @@
+name: diag-outputs
+on: workflow_dispatch
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    steps:
+      - id: s
+        shell: bash
+        run: |
+          for i in $(seq 1 45); do echo "out$i=val$i" >> "$GITHUB_OUTPUT"; done
+          echo "wrote 45 outputs to GITHUB_OUTPUT"
+  read:
+    needs: set
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          echo "OUTPUTS_JSON=${{ toJson(needs.set.outputs) }}"
+          echo "COUNT=$(echo '${{ toJson(needs.set.outputs) }}' | python -c 'import json,sys; print(len(json.load(sys.stdin)))')"
