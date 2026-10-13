@@ -24,8 +24,12 @@ PINS = [
     ("PIN_KERNELSU", "KERNELSU_SHA", "APPROVE_KERNELSU"),
     ("PIN_BAKASU", "BAKASU_SHA", "APPROVE_BAKASU"),
     ("PIN_SUKISU_ULTRA", "SUKISU_ULTRA_SHA", "APPROVE_SUKISU_ULTRA"),
-    # SUSFS is intentionally excluded: it is always resolved at latest so it
-    # stays API-matched to the always-latest KernelSU-Next tree.
+    ("PIN_NEXT", "NEXT_SHA", "APPROVE_NEXT"),
+    # The per-branch SUSFS pin maps (PIN_SUSFS*, including PIN_SUSFS_NEXT)
+    # are intentionally excluded: they hold one SHA per gki-* branch, which
+    # this single-SHA promotion flow cannot express. They are hand-audited
+    # together with the corresponding root pin - when the root pin moves,
+    # review the susfs branch tips for that flavor by hand.
 ]
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")

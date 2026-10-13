@@ -20,8 +20,13 @@ runs:
 
         for REJ in "${REJS[@]}"; do
           REL="${REJ#"$CONFIG_DIR"/}"
-          if [ "$(basename "$REL")" = "i2c-nomadik.c.rej" ]; then
-            echo "Skipping $REL because it matches the ignored reject file"
+          # Known-benign rejects, kept in sync with the aggregate reject
+          # summarizer in main.yml: i2c-nomadik (btf patch, unused on these
+          # trees) and rmap.c (ancient 5.10 quirk). Anything else means the
+          # kernel tree no longer matches the patch set - a silently broken
+          # image, so it is kept (and build.yml now fails the job on it).
+          if [ "$(basename "$REL")" = "i2c-nomadik.c.rej" ] || [ "$REL" = "common/mm/rmap.c.rej" ]; then
+            echo "Skipping $REL because it matches the ignored reject files"
             continue
           fi
           FILTERED_REJS+=("$REJ")
