@@ -165,6 +165,17 @@ jobs:
       susfs_commit_android14_6_1_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android14_6_1_sukisu_ultra }}
       susfs_commit_android15_6_6_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android15_6_6_sukisu_ultra }}
       susfs_commit_android16_6_12_sukisu_ultra: ${{ steps.resolve.outputs.susfs_commit_android16_6_12_sukisu_ultra }}
+      # KernelSU-Next (next) SUSFS pins. These MUST be declared here:
+      # $GITHUB_OUTPUT alone is not enough - a job output is only visible to
+      # downstream jobs through this mapping, otherwise the build-job ternary
+      # silently falls through to the generic pin (that bug shipped r22+).
+      susfs_commit_android12_5_10_next: ${{ steps.resolve.outputs.susfs_commit_android12_5_10_next }}
+      susfs_commit_android13_5_10_next: ${{ steps.resolve.outputs.susfs_commit_android13_5_10_next }}
+      susfs_commit_android13_5_15_next: ${{ steps.resolve.outputs.susfs_commit_android13_5_15_next }}
+      susfs_commit_android14_5_15_next: ${{ steps.resolve.outputs.susfs_commit_android14_5_15_next }}
+      susfs_commit_android14_6_1_next: ${{ steps.resolve.outputs.susfs_commit_android14_6_1_next }}
+      susfs_commit_android15_6_6_next: ${{ steps.resolve.outputs.susfs_commit_android15_6_6_next }}
+      susfs_commit_android16_6_12_next: ${{ steps.resolve.outputs.susfs_commit_android16_6_12_next }}
       ksu_commit: ${{ steps.resolve.outputs.ksu_commit }}
       bakasu_commit: ${{ steps.resolve.outputs.bakasu_commit }}
       sukisu_ultra_commit: ${{ steps.resolve.outputs.sukisu_ultra_commit }}
@@ -1959,6 +1970,13 @@ jobs:
           SUSFS_ANDROID14_6_1_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1_sukisu_ultra }}
           SUSFS_ANDROID15_6_6_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6_sukisu_ultra }}
           SUSFS_ANDROID16_6_12_SUKISU_ULTRA: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12_sukisu_ultra }}
+          SUSFS_ANDROID12_5_10_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android12_5_10_next }}
+          SUSFS_ANDROID13_5_10_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_10_next }}
+          SUSFS_ANDROID13_5_15_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android13_5_15_next }}
+          SUSFS_ANDROID14_5_15_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android14_5_15_next }}
+          SUSFS_ANDROID14_6_1_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android14_6_1_next }}
+          SUSFS_ANDROID15_6_6_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android15_6_6_next }}
+          SUSFS_ANDROID16_6_12_NEXT: ${{ needs.resolve-sources.outputs.susfs_commit_android16_6_12_next }}
           # KSU version not computed here; render will show placeholder if release job skipped
         run: |
           set -e
@@ -2047,6 +2065,7 @@ jobs:
           sus_map={"android12-5.10":env("SUSFS_ANDROID12_5_10",""),"android13-5.10":env("SUSFS_ANDROID13_5_10",""),"android13-5.15":env("SUSFS_ANDROID13_5_15",""),"android14-5.15":env("SUSFS_ANDROID14_5_15",""),"android14-6.1":env("SUSFS_ANDROID14_6_1",""),"android15-6.6":env("SUSFS_ANDROID15_6_6",""),"android16-6.12":env("SUSFS_ANDROID16_6_12","")}
           sus_map_bakasu={"android12-5.10":env("SUSFS_ANDROID12_5_10_BAKASU",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_BAKASU",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_BAKASU",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_BAKASU",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_BAKASU",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_BAKASU",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_BAKASU","")}
           sus_map_sukisu_ultra={"android12-5.10":env("SUSFS_ANDROID12_5_10_SUKISU_ULTRA",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_SUKISU_ULTRA",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_SUKISU_ULTRA",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_SUKISU_ULTRA",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_SUKISU_ULTRA",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_SUKISU_ULTRA",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_SUKISU_ULTRA","")}
+          sus_map_next={"android12-5.10":env("SUSFS_ANDROID12_5_10_NEXT",""),"android13-5.10":env("SUSFS_ANDROID13_5_10_NEXT",""),"android13-5.15":env("SUSFS_ANDROID13_5_15_NEXT",""),"android14-5.15":env("SUSFS_ANDROID14_5_15_NEXT",""),"android14-6.1":env("SUSFS_ANDROID14_6_1_NEXT",""),"android15-6.6":env("SUSFS_ANDROID15_6_6_NEXT",""),"android16-6.12":env("SUSFS_ANDROID16_6_12_NEXT","")}
           _flavors=[m.get("flavor","") for m in parse_managers(env("MANAGER_LIST","")) if m.get("flavor","")]
           if not _flavors:
               _flavors={"KernelSU-Next":["next"],"KernelSU":["kernelsu"],"BakaSU":["bakasu"],"SukiSU-Ultra":["sukisu-ultra"],"KowSU":["kowsu"],"No Root":[],"All":["next","kernelsu","bakasu"]}.get(root,["next","kernelsu","bakasu"])
@@ -2058,7 +2077,7 @@ jobs:
               _row=f"| gki-{v} |"
               for _fl in _flavors:
                   # KowSU never ships SUSFS: render n/a rather than shared pins.
-                  _sm={} if _fl=="kowsu" else (sus_map_sukisu_ultra if _fl=="sukisu-ultra" else (sus_map_bakasu if _fl=="bakasu" else sus_map))
+                  _sm={} if _fl=="kowsu" else (sus_map_sukisu_ultra if _fl=="sukisu-ultra" else (sus_map_bakasu if _fl=="bakasu" else (sus_map_next if _fl=="next" else sus_map)))
                   sha=_sm.get(v,"")
                   sha_s=f"[`{sha[:7]}`]({_susfs_url}/-/commit/{sha})" if sha else "_n/a_"
                   _row+=f" {sha_s} |"
