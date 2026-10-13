@@ -1,0 +1,233 @@
+name: diag-loop
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+# Audited pins (from root-variants.yml). Used only when commit_mode=verified.
+PIN_NOMOUNT="5a610db7649a59eb3e3d710653618d594941f8da"
+# KernelSU: synced with official main (0c0fdb96, 2026-10-12).
+# simonpunk's susfs sync commits (2026-10-12, all branches) rebased
+# 10_enable_susfs_for_ksu.patch onto this layout - it fails with 17
+# rejected hunks at the old 08a3b087 pin (run 38337419484) and
+# applies clean at 0c0fdb96. BBG is kernel-side and unaffected.
+PIN_KERNELSU="0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d"
+PIN_BAKASU="f4435f007b16f61705089ff982e3f981a6017979"
+PIN_SUKISU_ULTRA="b20dee702035af09cb2ecb5f35443bbc1747f3e6"
+# KernelSU-Next (next) kernel-side source = pershoot's dev-susfs fork.
+# Pin = the commit shipped in r21 (2026-10-01) - the last release
+# whose flashed image is known to boot. The fork's tip moved past it
+# on 10-12/10-13 with the LKM driver merge (8f573af) and the built-in
+# SuSFS v2.3.0 flip (8817cfa / 18ee2279): a half-finished hybrid of
+# LKM + built-in that still compiles but bootloops on flash.
+# Latest remains opt-in via commit_mode=latest (and promotion via
+# commit_mode=update after a successful build).
+PIN_NEXT="4c5853188012f63a1a1fedd4a57fda6375fecb38"
+declare -A PIN_SUSFS=(
+  [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+  [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+  [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+  [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+  [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
+  [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+  [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
+)
+# BakaSU keeps its own SUSFS pin set: their selinux_hide implements
+# the PRE-May-2026 contract - their tree has fake_status but does
+# NOT define `fake_state`, which the synced fs patches (50_add_,
+# since 5900f1a3 et al., 2026-05-12) reference and only the
+# 10_enable patch (kernelsu flavor) defines. Run 38347077072: the
+# BakaSU 6.1 leg died with ld.lld "undefined symbol: fake_state".
+# Each pin = the last susfs commit on that branch BEFORE fake_state
+# entered the fs patch (6.6's fs patch never gained it - tip is
+# fine). SukiSU-Ultra defines fake_state itself -> stays on tips.
+declare -A PIN_SUSFS_BAKASU=(
+  [susfs_commit_android12_5_10]="e1681bc4d6fa90203a1fd86f26a8583baa4433dc"
+  [susfs_commit_android13_5_10]="6a47d9a4717a4d72244f4ec7197a69596f029730"
+  [susfs_commit_android13_5_15]="349ed52eea1be5c9590289a76a90d78710d4bba0"
+  [susfs_commit_android14_5_15]="16a22b6a608b3f124c64f70829657871eee3af37"
+  [susfs_commit_android14_6_1]="ef16cbce5c5195988b9b630de85466148cbbcdef"
+  [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+  [susfs_commit_android16_6_12]="fd03bb9c3cb4ee07b16806e0528e06486ab1be2b"
+)
+# SukiSU-Ultra keeps its own SUSFS pin set too (same starting values).
+declare -A PIN_SUSFS_SUKISU_ULTRA=(
+  [susfs_commit_android12_5_10]="82f08351fadb8b19dd6591bd14634d02ad832145"
+  [susfs_commit_android13_5_10]="14c45388ec8cb3ca72f2ac8bf83097b9285a8418"
+  [susfs_commit_android13_5_15]="bd27d727b27fc90bfbb6eaccd28060a53c473266"
+  [susfs_commit_android14_5_15]="5ef83a32d707c3f750a4c154b7f3b04464f7a031"
+  [susfs_commit_android14_6_1]="5192aa2d33b381b58c1051532f9e1dfa5de6e8d3"
+  [susfs_commit_android15_6_6]="bd7d199ac87808001127e8a6d076832e2938cf0d"
+  [susfs_commit_android16_6_12]="5e0b2b925865000ca7dce993ecf1d281ee312887"
+)
+# KernelSU-Next keeps its own SUSFS pin set: the susfs4ksu branch tips
+# as they were when r21 shipped (2026-09-26 on every gki-* branch).
+# From here on the next flavor stops tracking branch tips implicitly:
+# verified mode pins both sides (KSUN 4c585318 + these susfs commits),
+# which is the exact r21 combination that boots. The two pershoot
+# cherry-picks in susfs-setup still apply on top of these pins
+# (verified clean by rehearsal, 2026-10-14).
+declare -A PIN_SUSFS_NEXT=(
+  [susfs_commit_android12_5_10]="9892175b4acec7ee844e113b8d02c0f4d12cdfac"
+  [susfs_commit_android13_5_10]="5326e21a7eb232f9e21debdd5164e99bee3d1e2f"
+  [susfs_commit_android13_5_15]="687d2d18d94cb2e3e72d1074778d58384d58e379"
+  [susfs_commit_android14_5_15]="6ba6ca79f85b8873b54573842093a9ae2df56cf9"
+  [susfs_commit_android14_6_1]="24743360ea08d98f6ad72b856851abed8de5854f"
+  [susfs_commit_android15_6_6]="a0f9c59e2243f8a5db955f4ad1686d5e0ad26e1a"
+  [susfs_commit_android16_6_12]="b213c54126fb243595ce7876e91d84d6e0861fec"
+)
+
+pick() { # pinned repo ref  -> pinned when verified, else latest
+  local pinned="$1" repo="$2" ref="$3"
+  if [ "$COMMIT_MODE" = "verified" ] && [ -n "$pinned" ]; then
+    echo "$pinned"
+  else
+    resolve_sha "$repo" "$ref"
+  fi
+}
+
+# NoMount (pinned in verified mode, else dev tip)
+emit nomount_commit "$(pick "$PIN_NOMOUNT" https://github.com/maxsteeel/nomount.git refs/heads/dev)"
+
+# KernelSU-Next manager - always built from the official repo's dev branch.
+# pershoot's fork is used only for the kernel SUSFS integration (root_commit below),
+# never for the manager. Manager always builds at latest.
+emit kernelsu_commit "$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
+echo "kernelsu_branch=dev" >> "$GITHUB_OUTPUT"
+
+# Selected root implementation(s). Maps the human-facing choice
+# (KernelSU-Next / KernelSU / BakaSU / SukiSU-Ultra / KowSU /
+# No Root / All) to internal root-setup flavors (next / kernelsu /
+# bakasu / sukisu-ultra / kowsu / none). 'All' emits a matrix of
+# the three core root flavors plus each pinned commit; SukiSU-Ultra,
+# KowSU, and No Root are opt-in only and never part of 'All'.
+#
+# kernelsu, bakasu, and sukisu-ultra pin in verified mode;
+# KernelSU-Next (next) always builds at latest.
+# With SUSFS off, every root tracks latest instead of pins:
+# SukiSU-Ultra follows main (builtin only matters for SUSFS builds).
+# Scheduled runs default SUSFS on (all features on, see the
+# feature_set computation) - a nightly is a full-featured build.
+if [ "schedule" = "schedule" ]; then
+  SCHED_SUSFS=true
+else
+  SCHED_SUSFS="true"
+fi
+if [ "$SCHED_SUSFS" = "true" ]; then
+  KERNELSU_COMMIT="$(pick "$PIN_KERNELSU" https://github.com/tiann/KernelSU.git refs/heads/main)"
+  BAKASU_COMMIT="$(pick "$PIN_BAKASU" https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
+  SUKISU_ULTRA_COMMIT="$(pick "$PIN_SUKISU_ULTRA" https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/builtin)"
+else
+  KERNELSU_COMMIT="$(resolve_sha https://github.com/tiann/KernelSU.git refs/heads/main)"
+  BAKASU_COMMIT="$(resolve_sha https://github.com/Baka-SU/BakaSU.git refs/heads/main)"
+  SUKISU_ULTRA_COMMIT="$(resolve_sha https://github.com/SukiSU-Ultra/SukiSU-Ultra.git refs/heads/main)"
+fi
+emit ksu_commit "$KERNELSU_COMMIT"
+emit bakasu_commit "$BAKASU_COMMIT"
+emit sukisu_ultra_commit "$SUKISU_ULTRA_COMMIT"
+# KowSU has no SUSFS support, so it always tracks latest on master
+# (it can only ever run with SUSFS off — enforced below).
+KOWSU_COMMIT="$(resolve_sha https://github.com/KOWX712/KernelSU.git refs/heads/master)"
+emit kowsu_commit "$KOWSU_COMMIT"
+if [ "$SCHED_SUSFS" = "true" ]; then
+  # KernelSU-Next kernel-side source (pershoot fork, SUSFS arm):
+  # pinned in verified mode, branch tip only in latest mode.
+  NEXT_COMMIT="$(pick "$PIN_NEXT" https://github.com/pershoot/KernelSU-Next.git refs/heads/dev-susfs)"
+else
+  NEXT_COMMIT="$(resolve_sha https://github.com/KernelSU-Next/KernelSU-Next.git refs/heads/dev)"
+fi
+
+mk_entry() { # flavor variant commit produce
+  printf '{"root_flavor":"%s","variant":"%s","root_commit":"%s","produce":%s}' "$1" "$2" "$3" "$4"
+}
+
+# On 'schedule' there are no inputs, so the default must be the exact
+# label the "All" arm matches below — a bare 'All' fell through to *)
+# and failed the whole job, yet the manager step's All* glob still
+# matched, so the two steps disagreed. Keep these in sync.
+case "KernelSU-Next" in
+  KernelSU)
+    echo "root_flavor=kernelsu" >> "$GITHUB_OUTPUT"
+    emit root_commit "$KERNELSU_COMMIT"
+    ROOT_MATRIX="[$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT" true)]"
+    ;;
+  KernelSU-Next)
+    echo "root_flavor=next" >> "$GITHUB_OUTPUT"
+    emit root_commit "$NEXT_COMMIT"
+    ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT" true)]"
+    ;;
+  BakaSU)
+    echo "root_flavor=bakasu" >> "$GITHUB_OUTPUT"
+    emit root_commit "$BAKASU_COMMIT"
+    ROOT_MATRIX="[$(mk_entry bakasu BakaSU "$BAKASU_COMMIT" true)]"
+    ;;
+  SukiSU-Ultra)
+    echo "root_flavor=sukisu-ultra" >> "$GITHUB_OUTPUT"
+    emit root_commit "$SUKISU_ULTRA_COMMIT"
+    ROOT_MATRIX="[$(mk_entry sukisu-ultra SukiSU-Ultra "$SUKISU_ULTRA_COMMIT" true)]"
+    ;;
+  KowSU)
+    if [ "true" = "true" ]; then
+      echo "ERROR: KowSU does not work together with SUSFS — re-run with SUSFS off." >&2
+      exit 1
+    fi
+    echo "root_flavor=kowsu" >> "$GITHUB_OUTPUT"
+    emit root_commit "$KOWSU_COMMIT"
+    ROOT_MATRIX="[$(mk_entry kowsu KowSU "$KOWSU_COMMIT" true)]"
+    ;;
+  "No Root")
+    echo "root_flavor=none" >> "$GITHUB_OUTPUT"
+    echo "root_commit=" >> "$GITHUB_OUTPUT"
+    ROOT_MATRIX='[{"root_flavor":"none","variant":"NoRoot","root_commit":""}]'
+    ;;
+  "All (KernelSU-Next + KernelSU + BakaSU)")
+    # Fan out to all three root variants, each with its pinned commit.
+    ROOT_MATRIX="[$(mk_entry next KernelSU-Next "$NEXT_COMMIT" true),$(mk_entry kernelsu KernelSU "$KERNELSU_COMMIT" false),$(mk_entry bakasu BakaSU "$BAKASU_COMMIT" false)]"
+    echo "root_flavor=" >> "$GITHUB_OUTPUT"
+    echo "root_commit=" >> "$GITHUB_OUTPUT"
+    ;;
+  *)
+    echo "ERROR: unknown root_flavor 'KernelSU-Next'" >&2
+    exit 1
+    ;;
+esac
+echo "root_matrix=$ROOT_MATRIX" >> "$GITHUB_OUTPUT"
+
+# SUSFS per supported Android/kernel branch (gitlab simonpunk/susfs4ksu).
+# Every flavor gets its own output: verified mode pins each one to an
+# audited commit (next included - see PIN_SUSFS_NEXT), latest mode
+# resolves the branch tip for all of them. The build jobs pick the
+# right output per matrix entry; build.yml never overrides them.
+declare -A SUSFS_BRANCHES=(
+  [susfs_commit_android12_5_10]="gki-android12-5.10"
+  [susfs_commit_android13_5_10]="gki-android13-5.10"
+  [susfs_commit_android13_5_15]="gki-android13-5.15"
+  [susfs_commit_android14_5_15]="gki-android14-5.15"
+  [susfs_commit_android14_6_1]="gki-android14-6.1"
+  [susfs_commit_android15_6_6]="gki-android15-6.6"
+  [susfs_commit_android16_6_12]="gki-android16-6.12"
+)
+for key in "${!SUSFS_BRANCHES[@]}"; do
+  emit "$key" "$(pick "${PIN_SUSFS[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
+  # Per-flavor BakaSU SUSFS pin (same branch, own pin set).
+  emit "${key}_bakasu" "$(pick "${PIN_SUSFS_BAKASU[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
+  # Per-flavor SukiSU-Ultra SUSFS pin (same branch, own pin set).
+  emit "${key}_sukisu_ultra" "$(pick "${PIN_SUSFS_SUKISU_ULTRA[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
+  # Per-flavor KernelSU-Next SUSFS pin (r21 tips, see PIN_SUSFS_NEXT).
+  emit "${key}_next" "$(pick "${PIN_SUSFS_NEXT[$key]}" https://gitlab.com/simonpunk/susfs4ksu.git refs/heads/${SUSFS_BRANCHES[$key]})"
+done
+
+
+          echo "=== counts ==="
+          wc -l < emitted.txt
+          echo "next_emits=$(grep -c _next emitted.txt || true)"
+          echo "=== bash ==="; bash --version | head -1
+          echo "=== PIN_SUSFS_NEXT ==="
+          echo "count=${#PIN_SUSFS_NEXT[@]}"
+          echo "keys=${!PIN_SUSFS_NEXT[@]}"
+          echo "=== emitted _next lines ==="
+          grep _next emitted.txt || echo NONE
