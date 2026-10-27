@@ -1,3 +1,20 @@
+> [!NOTE]
+> ### 本 fork 的改动（jiangsl1303/GKI_KernelSU_SUSFS）
+>
+> 在 2026-10-27 对齐上游 `222173a6` 之后新增，目标是「**GKI 内核 + 最新 SUSFS + 最新 KernelSU-Next**」：
+>
+> | 路径 | 作用 |
+> |---|---|
+> | `.github/workflows/gki-latest.yml` | 一键构建：固定 `root=KernelSU-Next`(pershoot `dev-susfs`) + SUSFS 各 KMI 分支 tip，默认特性只开 SUSFS |
+> | `tools/resolve_latest.py` | 实时解析最新 KSUN / SUSFS commit，生成构建矩阵（git 失败回退 GitHub/GitLab API） |
+> | `tools/preflight.py` | 推送前预检：YAML + 上游校验脚本 + 全部 shell 块 `bash -n` + 跨 workflow 输入契约 |
+> | `tools/trigger.py` / `monitor.py` / `notify.py` | 触发 / 轮询并下载产物 / Server酱推送 |
+> | `tools/sync_push.sh` | 把本地工作树强制同步为 fork main（带回滚 ref） |
+> | `docs/BUILD-LATEST.md` | 中文手册：触发方式、产物、6 条踩坑、排错对照表 |
+>
+> 触发入口：`Actions` → **GKI Latest (KernelSU-Next + SUSFS)** → `Run workflow`。
+> 上游原有 `Build Kernels`（全功能矩阵）保持不动，随时可回退使用。
+
 <div align="center">
 
 # Wild Kernels for Android devices running GKI 2.0 (5.10+)
