@@ -81,6 +81,7 @@ python tools/monitor.py --latest --download outputs
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
+| run 结论 `startup_failure` 且 **0 个 job** | 调用方 `permissions` 收窄到 `read`，而被调的 `build.yml` 自己声明了 `contents: write` / `actions: write` | 调用方顶层必须是 `contents: write, actions: write`（与上游 `main.yml` 一致）。本地 `preflight.py` 查不出这条，靠这条对照表 |
 | resolve 作业失败：`Failed to resolve xxx` | 上游分支改名 / gitlab 抖动 | 看 `tools/resolve_latest.py` 输出，单独 `git ls-remote` 复现 |
 | `no build targets match patch level` | `os_patch_level` 与 `.github/config/*.json` 里的 date/sublevel 不匹配 | 用 `lts` 或 `all`，或 `python tools/resolve_latest.py` 看可用目标 |
 | 补丁步骤 exit 1 / `.rej` 一堆 | 内核 sublevel 与 SUSFS tip 不匹配 | 换 `lts`；或降到该分支更早的 sublevel |
