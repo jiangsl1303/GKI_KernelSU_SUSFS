@@ -74,11 +74,15 @@ fi
 
 say ""
 say "== 4) 推送 =="
-say "    git push --force-with-lease origin HEAD:$BRANCH"
+LEASH=""
+if [ -n "${OLD_FORK_SHA:-}" ]; then
+  LEASH="--force-with-lease=refs/heads/$BRANCH:$OLD_FORK_SHA"
+fi
+say "    git push $LEASH origin HEAD:$BRANCH"
 if [ "$PLAN" = "1" ]; then
   say "[*] --plan / 无凭据 → 不推。要真推请：GH_TOKEN=... bash tools/sync_push.sh"
   exit 0
 fi
-git push --force-with-lease "$PUSH_URL" "HEAD:refs/heads/$BRANCH"
+git push $LEASH "$PUSH_URL" "HEAD:refs/heads/$BRANCH"
 say "[+] 已推送。接下来："
 say "    python tools/trigger.py --families android14-6.1 --os-patch-level lts"
