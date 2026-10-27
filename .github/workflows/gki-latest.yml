@@ -11,9 +11,12 @@ name: GKI Latest (KernelSU-Next + SUSFS)
 #
 # 允许的 feature 记号：SUSFS,NoMount,BBG,NET,DS,NTSync,Ptrace,Unicode,BPF,Perf
 
+# build.yml 自己声明了 contents: write / actions: write（缓存桶要推 release/tag），
+# 调用方的 permissions 是它的上限 —— 收窄到 read 会让整条工作流在启动阶段
+# 就 startup_failure（0 个 job），所以这里必须与上游 main.yml 保持一致。
 permissions:
-  contents: read
-  actions: read
+  contents: write
+  actions: write
 
 on:
   workflow_dispatch:
