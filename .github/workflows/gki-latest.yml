@@ -1,0 +1,197 @@
+name: GKI Latest (KernelSU-Next + SUSFS)
+
+# 一键构建「最新 KernelSU-Next + 最新 SUSFS」的 GKI 内核。
+#
+# 与上游 main.yml 的区别（这是本仓库的定位，别改回去）：
+#   * 固定 root = KernelSU-Next（内核侧走 pershoot/KernelSU-Next dev-susfs，
+#     它才是带 SUSFS 集成的 KernelSU-Next；官方仓库不带集成，硬拼会链接失败）
+#   * 固定 SUSFS = 各 KMI 分支 tip（simonpunk/susfs4ksu），绝不钉死旧版本
+#   * 默认特性集只有 SUSFS —— 最少的补丁面 = 最多的成功率
+#   * 复用上游 prepare.yml / build.yml，不复制它们的构建逻辑
+#
+# 允许的 feature 记号：SUSFS,NoMount,BBG,NET,DS,NTSync,Ptrace,Unicode,BPF,Perf
+
+permissions:
+  contents: read
+  actions: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      families:
+        description: "GKI 家族：all 或逗号分隔（android12-5.10,android13-5.15,android14-6.1,android15-6.6,android16-6.12）"
+        required: true
+        type: string
+        default: "all"
+      os_patch_level:
+        description: "过滤目标：lts（仅 LTS 分支）/ all / 日期如 2026-09 / sublevel 如 141"
+        required: true
+        type: string
+        default: "lts"
+      features:
+        description: "特性集（逗号分隔，默认仅 SUSFS）"
+        required: false
+        type: string
+        default: "SUSFS"
+      page_size:
+        description: "ARM64 页大小（16k 仅支持 6.1/6.6/6.12 家族）"
+        required: false
+        type: choice
+        options:
+          - 4k
+          - 16k
+        default: "4k"
+      brand_name:
+        description: "版本串后缀（空 = 原样）"
+        required: false
+        type: string
+        default: "Wild"
+      use_cache:
+        description: "启用 ccache/bazel 缓存（fork 里没有缓存桶，默认关闭更稳）"
+        required: false
+        type: boolean
+        default: false
+      notify_serverchan:
+        description: "构建结束后用 Server酱推送结果"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: gki-latest-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: Resolve latest KernelSU-Next + SUSFS
+    runs-on: ubuntu-latest
+    outputs:
+      ksu_commit: ${{ steps.resolve.outputs.ksu_commit }}
+      ksu_ref: ${{ steps.resolve.outputs.ksu_ref }}
+      feature_set: ${{ steps.resolve.outputs.feature_set }}
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      susfs_table: ${{ steps.resolve.outputs.susfs_table }}
+      nomount_commit: ${{ steps.resolve.outputs.nomount_commit }}
+      kernel_patches_commit: ${{ steps.resolve.outputs.kernel_patches_commit }}
+      anykernel3_commit: ${{ steps.resolve.outputs.anykernel3_commit }}
+      droidspaces_commit: ${{ steps.resolve.outputs.droidspaces_commit }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Resolve component commits and build matrix
+        id: resolve
+        shell: bash
+        env:
+          FAMILIES: ${{ inputs.families }}
+          OS_PATCH_LEVEL: ${{ inputs.os_patch_level }}
+          FEATURES: ${{ inputs.features }}
+        run: |
+          set -euo pipefail
+          python3 tools/resolve_latest.py \
+            --families "${FAMILIES:-all}" \
+            --os-patch-level "${OS_PATCH_LEVEL:-lts}" \
+            --features "${FEATURES:-SUSFS}" \
+            --json /tmp/gki-resolve.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Publish resolved versions to the job summary
+        shell: bash
+        env:
+          SUSFS_TABLE: ${{ steps.resolve.outputs.susfs_table }}
+          KSU_COMMIT: ${{ steps.resolve.outputs.ksu_commit }}
+          KSU_REF: ${{ steps.resolve.outputs.ksu_ref }}
+          FEATURE_SET: ${{ steps.resolve.outputs.feature_set }}
+          PAGE_SIZE: ${{ inputs.page_size }}
+          OS_PATCH_LEVEL: ${{ inputs.os_patch_level }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+
+          table = json.loads(os.environ.get("SUSFS_TABLE") or "{}")
+          lines = [
+              "## 构建计划",
+              "",
+              "| 组件 | 值 |",
+              "|------|-----|",
+              f"| KernelSU-Next | `{os.environ['KSU_COMMIT']}` ({os.environ['KSU_REF']}) |",
+              f"| Feature set | `{os.environ['FEATURE_SET']}` |",
+              f"| 页大小 | `{os.environ['PAGE_SIZE']}` |",
+              f"| os_patch_level | `{os.environ['OS_PATCH_LEVEL']}` |",
+              "",
+              "| GKI 家族 | SUSFS 版本 | SUSFS commit |",
+              "|----------|------------|--------------|",
+          ]
+          for family, info in table.items():
+              lines.append(f"| {family} | {info['version']} | `{info['commit']}` |")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as fh:
+              fh.write("\n".join(lines) + "\n")
+          PY
+
+  build:
+    name: ${{ matrix.family }}
+    needs: resolve
+    if: ${{ needs.resolve.outputs.matrix != '' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.matrix) }}
+    uses: ./.github/workflows/prepare.yml
+    with:
+      config_file: ${{ matrix.config_file }}
+      feature_set: ${{ needs.resolve.outputs.feature_set }}
+      susfs_commit: ${{ matrix.susfs_commit }}
+      root_flavor: next
+      root_commit: ${{ needs.resolve.outputs.ksu_commit }}
+      variant: KernelSU-Next
+      nomount_commit: ${{ needs.resolve.outputs.nomount_commit }}
+      kernel_patches_commit: ${{ needs.resolve.outputs.kernel_patches_commit }}
+      anykernel3_commit: ${{ needs.resolve.outputs.anykernel3_commit }}
+      droidspaces_commit: ${{ needs.resolve.outputs.droidspaces_commit }}
+      brand_name: ${{ inputs.brand_name || 'Wild' }}
+      keep_kmi: false
+      allow_version_mismatch: false
+      use_cache: ${{ inputs.use_cache }}
+      page_size: ${{ inputs.page_size }}
+      os_patch_level: ${{ inputs.os_patch_level }}
+    secrets: inherit
+
+  notify:
+    name: Notify (Server酱)
+    needs:
+      - resolve
+      - build
+    if: ${{ always() && inputs.notify_serverchan }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push build result
+        shell: bash
+        env:
+          SERVERCHAN_SENDKEY: ${{ secrets.SERVERCHAN_SENDKEY }}
+          RESOLVE_RESULT: ${{ needs.resolve.result }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          KSU_COMMIT: ${{ needs.resolve.outputs.ksu_commit }}
+          SUSFS_TABLE: ${{ needs.resolve.outputs.susfs_table }}
+          FEATURE_SET: ${{ needs.resolve.outputs.feature_set }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SERVERCHAN_SENDKEY:-}" ]; then
+            echo "::notice title=Server酱::未配置 secrets.SERVERCHAN_SENDKEY，跳过推送"
+            exit 0
+          fi
+          SUSFS_VER="$(python3 -c "import json,os;d=json.loads(os.environ['SUSFS_TABLE'] or '{}');print(','.join(sorted({v['version'] for v in d.values()})) or 'N/A')")"
+          TITLE="GKI 构建 ${BUILD_RESULT} · KSUN ${KSU_COMMIT:0:9} · SUSFS ${SUSFS_VER}"
+          BODY="$(printf '## GKI Latest 构建结果\n\n- 结论: **%s** (resolve=%s)\n- KernelSU-Next: `%s`\n- SUSFS: %s\n- 特性: `%s`\n- 运行: %s/%s/actions/runs/%s\n\n产物在 run 页面的 Artifacts（`*-AnyKernel3` / `*-BuildInfo` / `*-Rejects`）。\n' \
+            "$BUILD_RESULT" "$RESOLVE_RESULT" "$KSU_COMMIT" "$SUSFS_VER" "$FEATURE_SET" \
+            "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          curl -sS --fail --max-time 30 \
+            -X POST "https://sctapi.ftqq.com/${SERVERCHAN_SENDKEY}.send" \
+            --data-urlencode "title=${TITLE}" \
+            --data-urlencode "desp=${BODY}" \
+            -o /tmp/serverchan.json || echo "::warning title=Server酱::推送失败（不阻塞构建）"
+          head -c 300 /tmp/serverchan.json 2>/dev/null || true
