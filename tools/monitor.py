@@ -98,6 +98,7 @@ def main() -> int:
     ap.add_argument("--repo", default=DEFAULT_REPO)
     ap.add_argument("--workflow", default=DEFAULT_WORKFLOW)
     ap.add_argument("--interval", type=int, default=45)
+    ap.add_argument("--max-minutes", type=int, default=150, help="最多等多久（默认 150 分钟）")
     ap.add_argument("--download", default="")
     ap.add_argument("--token", default="")
     ap.add_argument("--latest", action="store_true")
@@ -112,10 +113,14 @@ def main() -> int:
         run_id = latest_run(args.repo, args.workflow, token)
         print(f"[*] 最近一次 run: {run_id}")
 
+    deadline = time.time() + args.max_minutes * 60
     while True:
         status, conclusion = show(args.repo, run_id, token)
         if status == "completed":
             print(f"\n[=] 结论: {conclusion}")
+            break
+        if time.time() > deadline:
+            print(f"\n[!] 超过 {args.max_minutes} 分钟仍未结束，停止等待（run 还在跑）")
             break
         time.sleep(args.interval)
 
