@@ -1,0 +1,8 @@
+# 需要 LF 的文件类型：CRLF 会让 Actions 里的 bash 直接报 `\r: command not found`，
+# 也会让 patch/diff 类步骤出现假的上下文不匹配。
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.sh     text eol=lf
+*.py     text eol=lf
+*.patch  text eol=lf
+*.json   text eol=lf
